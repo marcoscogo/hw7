@@ -64,6 +64,12 @@ exports.handler = async function(event) {
   // get the documents from the query
   let sections = sectionsQuery.docs
 
+  // define aggregation variables
+  let numSectionReviews = 0
+  let sumSectionRating = 0
+  let numCourseReviews = 0
+  let sumCourseRating = 0
+
   // loop through the documents
   for (let i=0; i < sections.length; i++) {
     // get the document ID of the section
@@ -81,10 +87,55 @@ exports.handler = async function(event) {
     // add the lecturer's name to the section's data
     sectionData.lecturerName = lecturer.name
 
-    // add the section data to the courseData
-    courseData.sections.push(sectionData)
-
     // 🔥 your code for the reviews/ratings goes here
+
+    // set sectionData array
+    sectionData.reviews = []
+
+    // pull reviews by section
+    let reviewsQuery = await db.collection(`reviews`).where(`sectionId`, `==`, sectionId).get()
+
+    // use query to pull docs
+    let reviews = reviewsQuery.docs
+
+    // define aggregation variables
+    let numSectionReviews = 0
+    let sumSectionRating = 0
+
+    // loop thru docs
+    for (let reviewIndex = 0; reviewIndex < reviews.length; reviewIndex++) {
+      
+      // define variable for review
+      let reviewId = reviews[reviewIndex].id
+
+      // get the data from the review
+      let reviewData = reviews[reviewIndex].data()
+
+      // add the review data to the sectionData
+      sectionData.reviews.push(reviewData)
+
+        // add the aggregated number of reviews and average rating for the course
+        numSectionReviews = numSectionReviews + 1
+        sumSectionRating = sumSectionRating + reviewData.rating
+    }
+
+  // calculate review count and average rating
+  sectionData.numSectionReviews = numSectionReviews
+  sectionData.avgRating = sumSectionRating / numSectionReviews
+
+  // add section to course
+  courseData.sections.push(sectionData)
+
+  // add number of course ratings
+  numCourseReviews = numCourseReviews + numSectionReviews
+
+  // calculate sum of ratings
+  sumCourseRating = sumCourseRating + sumSectionRating
+
+  // calculate review count and average rating for course
+  courseData.numCourseReviews = numCourseReviews
+  courseData.avgRating = sumCourseRating / numCourseReviews
+
   }
 
   // return the standard response
